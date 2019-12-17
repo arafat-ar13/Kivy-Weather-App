@@ -15,6 +15,7 @@ from backend import auto_detect_loc, get_weather_data
 Config.set('graphics', 'width', '500')
 Config.set('graphics', 'height', '400')
 
+
 class InputScreen(GridLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -23,14 +24,15 @@ class InputScreen(GridLayout):
 
         self.inside = GridLayout()
         self.inside.cols = 2
-        
+
         self.inside.city_label = Label(text="Enter the name of the city")
         self.inside.add_widget(self.inside.city_label)
-        
+
         self.inside.city = TextInput(multiline=False)
         self.inside.add_widget(self.inside.city)
 
-        self.inside.country_label = Label(text="Enter the country for better accuracy")
+        self.inside.country_label = Label(
+            text="Enter the country for better accuracy")
         self.inside.add_widget(self.inside.country_label)
 
         self.inside.country = TextInput(multiline=False)
@@ -39,13 +41,16 @@ class InputScreen(GridLayout):
         self.add_widget(self.inside)
 
         self.submit = Button(text="Enter", font_size=30, size_hint=(1.2, 0.5))
-        self.submit.bind(on_press=lambda x:self.get_weather_info(city=self.inside.city.text, country=self.inside.country.text))
+        self.submit.bind(on_press=lambda x: self.get_weather_info(
+            city=self.inside.city.text, country=self.inside.country.text))
         self.add_widget(self.submit)
 
-        self.auto_detect = Button(text="Detect your location", font_size=30, size_hint=(1.2, 0.5))
-        self.auto_detect.bind(on_press=lambda x:self.get_weather_info(check_type="auto"))
+        self.auto_detect = Button(
+            text="Detect your location", font_size=30, size_hint=(1.2, 0.5))
+        self.auto_detect.bind(
+            on_press=lambda x: self.get_weather_info(check_type="auto"))
         self.add_widget(self.auto_detect)
-    
+
     def get_weather_info(self, check_type="manual", city="", country=""):
         if check_type == "auto":
             data = auto_detect_loc()
@@ -66,7 +71,8 @@ class InputScreen(GridLayout):
         self.inside.city.text = ""
         self.inside.country.text = ""
 
-        popup = Popup(title="City not found error", content=Label(text="The entered data didn't match any places", color=[1, 0, 0, 1]), size_hint=(0.6, 0.2))            
+        popup = Popup(title="City not found error", content=Label(
+            text="The entered data didn't match any places", color=[1, 0, 0, 1]), size_hint=(0.6, 0.2))
         popup.open()
 
 
@@ -75,20 +81,28 @@ class WeatherScreen(FloatLayout):
         super().__init__(**kwargs)
 
     def decorate_page(self, data):
-        self.city, self.country, self.temp, self.humidity, self.rain, self.snow, self.description = data
+        self.city, self.country, self.temp, self.humidity, self.rain, self.snow, self.description, self.time, self.time_state = data
 
         self.inside = GridLayout()
         self.inside.rows = 4
 
+        if self.time_state == "Day":
+            color = [0, 0, 0, 1]
+        elif self.time_state == "Night":
+            color = [1, 1, 1, 1]
+
         # First row, city and country info
-        self.inside.info_label = Label(text=f"{self.city}, {self.country}", color=[0, 0, 0, 1], font_size="23sp")
+        self.inside.info_label = Label(text=f"{self.city}, {self.country}", color=[
+                                       0, 0, 0, 1] if self.description == "haze" else color, font_size="23sp")
         self.inside.add_widget(self.inside.info_label)
 
         # Second row, temperature
-        self.inside.temp_label = Label(text=f"{self.temp} °F", color=[0, 0, 0, 1], font_size="63sp")
+        self.inside.temp_label = Label(
+            text=f"{self.temp} °F", color=color, font_size="63sp")
         self.inside.add_widget(self.inside.temp_label)
 
-        self.inside.extra_info_description = Label(text=f"{self.description}", color=[0, 0, 0, 1], font_size="23sp")
+        self.inside.extra_info_description = Label(
+            text=f"{self.description}", color=color, font_size="23sp")
         self.inside.add_widget(self.inside.extra_info_description)
 
         self.back = Button(text="Go back")
@@ -101,16 +115,41 @@ class WeatherScreen(FloatLayout):
 
     def handle_bg_pic(self):
         """A method to handle the background picture of the weather screen depending on how the weather is"""
-        if "snow" in self.description or "mist" in self.description or self.temp < 32:
-            self.add_widget(Image(source="weather_pictures/snow.jpg"))
-        elif "rain" in self.description or "shower" in self.description:
-            self.add_widget(Image(source="weather_pictures/rain.jpg"))
-        elif "cloud" in self.description or "wind" in self.description:
-            self.add_widget(Image(source="weather_pictures/windy.jpg"))
-        elif "sun" in self.description or "haze" in self.description or self.temp > 65:
-            self.add_widget(Image(source="weather_pictures/sunny.png"))
-        else:
-            self.add_widget(Image(source="weather_pictures/clear_sky.jpg"))
+        if self.time_state == "Day":
+            if "snow" in self.description:
+                self.add_widget(Image(source="weather_pictures/day_snow.jpg"))
+            elif "rain" in self.description or "drizzle" in self.description:
+                self.add_widget(
+                    Image(source="weather_pictures/day_raining.jpg"))
+            elif "clear sky" in self.description:
+                self.add_widget(
+                    Image(source="weather_pictures/day_clear_sky.jpg"))
+
+        elif self.time_state == "Night":
+            if "snow" in self.description:
+                self.add_widget(
+                    Image(source="weather_pictures/night_snow.jpg"))
+            elif "rain" in self.description or "drizzle" in self.description:
+                self.add_widget(
+                    Image(source="weather_pictures/night_raining.jpg"))
+            elif "clear sky" in self.description:
+                self.add_widget(
+                    Image(source="weather_pictures/night_clear_sky.jpg"))
+
+        if "haze" in self.description:
+            self.add_widget(Image(source="weather_pictures/haze.jpg"))
+        elif "shower" in self.description:
+            self.add_widget(Image(source="weather_pictures/showers.jpg"))
+        elif "mist" in self.description or "fog" in self.description:
+            self.add_widget(Image(source="weather_pictures/mist.jpg"))
+        elif "storm" in self.description or "thunder" in self.description:
+            self.add_widget(Image(source="weather_pictures/storm.jpg"))
+        elif "cloud" in self.description:
+            self.add_widget(Image(source="weather_pictures/cloud.jpg"))
+        elif "win" in self.description:
+            self.add_widget(Image(source="weather_pictures/wind.jpg"))
+        elif self.temp >= 75 or "sun" in self.description:
+            self.add_widget(Image(source="weather_pictures/hot_day.jpg"))
 
     def back_to_main(self, instance):
         weather_app.input_page.inside.city.text = ""
@@ -136,6 +175,7 @@ class MyApp(App):
         self.screen_manager.add_widget(screen)
 
         return self.screen_manager
+
 
 if __name__ == "__main__":
     weather_app = MyApp()
