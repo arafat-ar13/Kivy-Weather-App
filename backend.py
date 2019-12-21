@@ -31,8 +31,8 @@ def get_weather_data(city, country="", unit="imperial"):
     else:
         r = requests.get(f"https://api.openweathermap.org/data/2.5/find?q={city},{country}&appid={API_KEY}&units={unit}")
 
-    time, day_night = night_or_day(city)
     try:
+        time, day_night = night_or_day(city)
         for data in r.json()["list"]:
             name = data["name"]
             temperature = data["main"]["temp"]
