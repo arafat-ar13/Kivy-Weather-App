@@ -10,7 +10,7 @@ from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import Screen, ScreenManager, SlideTransition
 from kivy.uix.textinput import TextInput
 
-from backend import auto_detect_loc, get_weather_data
+from backend import auto_detect_loc, check_internet, get_weather_data
 
 Config.set('graphics', 'width', '500')
 Config.set('graphics', 'height', '400')
@@ -52,27 +52,36 @@ class InputScreen(GridLayout):
         self.add_widget(self.auto_detect)
 
     def get_weather_info(self, check_type="manual", city="", country=""):
-        if check_type == "auto":
-            data = auto_detect_loc()
-            print(data)
+        if check_internet():
+            if check_type == "auto":
+                data = auto_detect_loc()
+                print(data)
+            else:
+                data = get_weather_data(city, unit="imperial", country=country)
+                if data == None:
+                    self.handle_error()
+                print(data)
+            if data != None:
+                weather_app.weather_page.decorate_page(data)
+                self.go_to_weather_screen()
         else:
-            data = get_weather_data(city, unit="imperial", country=country)
-            if data == None:
-                self.handle_error()
-            print(data)
-        if data != None:
-            weather_app.weather_page.decorate_page(data)
-            self.go_to_weather_screen()
+            print("No internet connection present")
+            self.handle_error(err_type="no connection")
 
     def go_to_weather_screen(self):
         weather_app.screen_manager.current = "Weather Page"
 
-    def handle_error(self):
+    def handle_error(self, err_type="missing data"):
         self.inside.city.text = ""
         self.inside.country.text = ""
 
-        popup = Popup(title="City not found error", content=Label(
-            text="The entered data didn't match any places", color=[1, 0, 0, 1]), size_hint=(0.6, 0.2))
+        if err_type == "missing data":
+            popup = Popup(title="City not found error", content=Label(
+                text="The entered data didn't match any places", color=[1, 0, 0, 1]), size_hint=(0.6, 0.2))
+        elif err_type == "no connection":
+            popup = Popup(title="No Internet Connection", content=Label(
+                text="You currently don't have any internet connection. Try again later", color=[1, 0, 0, 1]), size_hint=(1.0, 0.2))
+
         popup.open()
 
 

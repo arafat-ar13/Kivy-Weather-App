@@ -1,18 +1,36 @@
+import datetime
 import os
+import socket
 
 import geocoder
-import requests
 import pytz
+import requests
 
-import datetime
-
-# Using OpenWeather API to handle weather forecast processing
+# Using OpenWeather API and Bing Maps API
 API_KEY = os.environ.get("OPENWEATHER_API_KEY")
 BING_MAPS_KEY = os.environ.get("BING_MAPS_KEY")
 
+
+def check_internet():
+    """
+    This method checks if an internet connect is present or not. If not, then the app will immediately let the user know that no internet connection is available.
+    """
+    try:
+        # connect to the host -- tells us if the host is actually
+        # reachable
+        s = socket.create_connection(("www.bing.com", 80))
+        s.close()
+
+        return True
+    except:
+        return False
+
+
 def get_time_zone(city):
-    r = requests.get(f"https://dev.virtualearth.net/REST/v1/TimeZone/?query={city}&key={BING_MAPS_KEY}")
+    r = requests.get(
+        f"https://dev.virtualearth.net/REST/v1/TimeZone/?query={city}&key={BING_MAPS_KEY}")
     return r.json()["resourceSets"][0]["resources"][0]["timeZoneAtLocation"][0]["timeZone"][0]["ianaTimeZoneId"]
+
 
 def night_or_day(city):
     tz = pytz.timezone(get_time_zone(city))
@@ -25,11 +43,14 @@ def night_or_day(city):
     else:
         return time, "Night"
 
+
 def get_weather_data(city, country="", unit="imperial"):
     if country == "":
-        r = requests.get(f"https://api.openweathermap.org/data/2.5/find?q={city}&appid={API_KEY}&units={unit}")
+        r = requests.get(
+            f"https://api.openweathermap.org/data/2.5/find?q={city}&appid={API_KEY}&units={unit}")
     else:
-        r = requests.get(f"https://api.openweathermap.org/data/2.5/find?q={city},{country}&appid={API_KEY}&units={unit}")
+        r = requests.get(
+            f"https://api.openweathermap.org/data/2.5/find?q={city},{country}&appid={API_KEY}&units={unit}")
 
     try:
         time, day_night = night_or_day(city)
@@ -46,6 +67,7 @@ def get_weather_data(city, country="", unit="imperial"):
             return name, country, temperature, humidity, rain, snow, description, time, day_night
     except:
         return None
+
 
 def auto_detect_loc():
     g = geocoder.ip("me")
