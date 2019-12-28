@@ -170,6 +170,7 @@ class WeatherScreen(FloatLayout):
 class MyApp(App):
     def build(self):
         self.title = "Weather App"
+        self.icon = "weather_pictures/weather_icon.png"
         self.screen_manager = ScreenManager()
 
         # Creating all of our screens to show up
