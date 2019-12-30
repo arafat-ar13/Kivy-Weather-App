@@ -1,7 +1,11 @@
+import json
+
 import kivy
 from kivy.app import App
 from kivy.config import Config
+from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.button import Button
+from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.image import Image
@@ -10,10 +14,75 @@ from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import Screen, ScreenManager, SlideTransition
 from kivy.uix.textinput import TextInput
 
-from backend import auto_detect_loc, check_internet, get_weather_data
+from backend import auto_detect_loc, check_internet, get_weather_data, unit_converter
 
 Config.set('graphics', 'width', '500')
 Config.set('graphics', 'height', '400')
+
+
+# Setting up a custom class to manage a settings icon that's also a button
+class ImageButton(ButtonBehavior, Image):
+    pressed = 0
+
+    def __init__(self, butt_type=None, **kwargs):
+        super().__init__(**kwargs)
+        
+        self.butt_type = butt_type
+
+        if self.butt_type == "settings":
+            self.source = "/home/arafat13/Downloads/settings_icon.png"
+            self.size_hint= (None, None)
+            self.size = (50, 50)
+            self.pos_hint = (None, None)
+            self.pos = (150, 150)
+
+        elif self.butt_type == "checkbox":
+            self.show_checkbox()
+
+    # This method is called the first time the checkbox is to be shown
+    # Therefore it reads the JSON file to show the checkbox appropriately
+    def show_checkbox(self):
+        self.settings_data = json.load(open("settings.json"))
+
+        if self.settings_data["use_celsius"]:
+            self.source = "atlas://data/images/defaulttheme/checkbox_on"
+        else:
+            self.source = "atlas://data/images/defaulttheme/checkbox_off"
+
+    def on_press(self):
+        if self.butt_type == "settings":
+            popup_layout = GridLayout(cols=2, rows=2)
+
+            self.msg_to_display = Label(text="Use Celsius")
+            popup_layout.add_widget(self.msg_to_display)
+
+            self.unit_checkbox = ImageButton("checkbox")
+            popup_layout.add_widget(self.unit_checkbox)
+
+            popup = Popup(title="Settings", size_hint=(None, None), size=(350, 200), content=popup_layout)
+            popup.open()
+
+        else:
+            self.toggle()
+
+    # This method again reads the JSON file which might look redundant but it is to keep in mind
+    # that this method is to be called every the checkbox if clicked so it is important to read and write to JSON
+    # file regardless of if the JSON is already read before
+    def toggle(self):
+        self.settings_data = json.load(open("settings.json"))
+
+        data = {"use_celsius": ""}
+        if self.settings_data["use_celsius"]:
+            do = "off"
+            data["use_celsius"] = False
+            weather_app.weather_page.update_temp_now("metric")
+        else:
+            do = "on"
+            data["use_celsius"] = True
+            weather_app.weather_page.update_temp_now("imperial")
+        
+        json.dump(data, open("settings.json", "w"))
+        self.source = f"atlas://data/images/defaulttheme/checkbox_{do}"
 
 
 class InputScreen(GridLayout):
@@ -53,11 +122,15 @@ class InputScreen(GridLayout):
 
     def get_weather_info(self, check_type="manual", city="", country=""):
         if check_internet():
+            # Reading unit data
+            settings_data = json.load(open("settings.json"))
+            unit = "imperial" if not settings_data["use_celsius"] else "metric"
+            symbol = "F" if not settings_data["use_celsius"] else "C"
             if check_type == "auto":
-                data = auto_detect_loc()
+                data = auto_detect_loc(unit, symbol)
                 print(data)
             else:
-                data = get_weather_data(city, unit="imperial", country=country)
+                data = get_weather_data(city, unit=unit, country=country, symbol=symbol)
                 if data == None:
                     self.handle_error()
                 print(data)
@@ -90,10 +163,13 @@ class WeatherScreen(FloatLayout):
         super().__init__(**kwargs)
 
     def decorate_page(self, data):
-        self.city, self.country, self.temp, self.humidity, self.rain, self.snow, self.description, self.time, self.time_state = data
+        self.city, self.country, self.temp, self.humidity, self.rain, self.snow, self.description, self.time, self.time_state, self.symbol = data
 
         self.inside = GridLayout()
         self.inside.rows = 4
+        
+        self.settings_button = ImageButton(butt_type="settings")
+        self.inside.add_widget(self.settings_button)
 
         if self.time_state == "Day":
             color = [0, 0, 0, 1]
@@ -107,7 +183,7 @@ class WeatherScreen(FloatLayout):
 
         # Second row, temperature
         self.inside.temp_label = Label(
-            text=f"{self.temp} °F", color=color, font_size="63sp")
+            text=f"{self.temp} °{self.symbol}", color=color, font_size="63sp")
         self.inside.add_widget(self.inside.temp_label)
 
         self.inside.extra_info_description = Label(
@@ -121,6 +197,12 @@ class WeatherScreen(FloatLayout):
         self.handle_bg_pic()
 
         self.add_widget(self.inside)
+
+    def update_temp_now(self, unit):
+        value, symbol = unit_converter(self.temp, unit)
+        self.inside.temp_label.text = f"{value} °{symbol}"
+
+        self.temp = value
 
     def handle_bg_pic(self):
         """A method to handle the background picture of the weather screen depending on how the weather is"""
