@@ -10,6 +10,16 @@ import requests
 API_KEY = os.environ.get("OPENWEATHER_API_KEY")
 BING_MAPS_KEY = os.environ.get("BING_MAPS_KEY")
 
+def unit_converter(value, unit):
+    if unit == "metric":
+        val = (value * 9/5) + 32
+        symbol = "F"
+    elif unit == "imperial":
+        val = (value - 32) * 5/9
+        symbol = "C"
+
+    return round(val, 2), symbol
+
 
 def check_internet():
     """
@@ -44,7 +54,7 @@ def night_or_day(city):
         return time, "Night"
 
 
-def get_weather_data(city, country="", unit="imperial"):
+def get_weather_data(city, country="", unit="imperial", symbol="F"):
     if country == "":
         r = requests.get(
             f"https://api.openweathermap.org/data/2.5/find?q={city}&appid={API_KEY}&units={unit}")
@@ -64,11 +74,11 @@ def get_weather_data(city, country="", unit="imperial"):
             for info in data["weather"]:
                 description = info["description"]
 
-            return name, country, temperature, humidity, rain, snow, description, time, day_night
+            return name, country, temperature, humidity, rain, snow, description, time, day_night, symbol
     except:
         return None
 
 
-def auto_detect_loc():
+def auto_detect_loc(unit, symbol):
     g = geocoder.ip("me")
-    return get_weather_data(g.city, g.country)
+    return get_weather_data(unit=unit, symbol=symbol, city=g.city, country=g.country)
