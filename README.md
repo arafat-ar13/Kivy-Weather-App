@@ -6,11 +6,10 @@ Built as a personal project
 
 ## Latest feature
 
-Settings page to toggle between units
+* Settings page to toggle between units
+* The app takes a few seconds (2-3s) to make the API calls to fetch weather data when the "Enter" button is pressed. This surely gives an impression that the app has frozen. To improve on this, a "Loading Screen" is recently implemented
 
 ## Upcoming features
-
-* The app takes a few seconds (2-3s) to make the API calls to fetch weather data when the "Enter" button is pressed. This surely gives an impression that the app has frozen. To improve on this, a "Loading Screen" is currently in the works
 
 * To make the app more fully-featured, a "Favorite Places" feature is also on the list of upcoming features. Users will be able to:
   * Add the current city that they are viewing to their favorites
