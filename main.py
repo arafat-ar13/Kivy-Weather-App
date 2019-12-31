@@ -19,6 +19,10 @@ from backend import auto_detect_loc, check_internet, get_weather_data, unit_conv
 Config.set('graphics', 'width', '500')
 Config.set('graphics', 'height', '400')
 
+#TODO: Add a simple script in the beginnig to create the settings.json file
+#TODO: Add a loading screen to add a visual effect while the app make API calls to show weather info
+#TODO: Implement a "Favorite Places" feature where users can add their favorite cities for quick access
+
 
 # Setting up a custom class to manage a settings icon that's also a button
 class ImageButton(ButtonBehavior, Image):
@@ -30,7 +34,7 @@ class ImageButton(ButtonBehavior, Image):
         self.butt_type = butt_type
 
         if self.butt_type == "settings":
-            self.source = "/home/arafat13/Downloads/settings_icon.png"
+            self.source = "weather_pictures/settings_icon.png"
             self.size_hint= (None, None)
             self.size = (50, 50)
             self.pos_hint = (None, None)
