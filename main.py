@@ -2,10 +2,11 @@ import json
 
 import kivy
 from kivy.app import App
+from kivy.clock import Clock
 from kivy.config import Config
 from kivy.uix.behaviors import ButtonBehavior
-from kivy.uix.button import Button
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.image import Image
@@ -14,14 +15,16 @@ from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import Screen, ScreenManager, SlideTransition
 from kivy.uix.textinput import TextInput
 
-from backend import auto_detect_loc, check_internet, get_weather_data, unit_converter
+from backend import (auto_detect_loc, check_internet, get_weather_data,
+                     unit_converter, create_settings_data)
 
 Config.set('graphics', 'width', '500')
 Config.set('graphics', 'height', '400')
 
-#TODO: Add a simple script in the beginnig to create the settings.json file
-#TODO: Add a loading screen to add a visual effect while the app make API calls to show weather info
-#TODO: Implement a "Favorite Places" feature where users can add their favorite cities for quick access
+# TODO: Implement a "Favorite Places" feature where users can add their favorite cities for quick access
+
+# Making a backend check to create a settings JSON file
+create_settings_data()
 
 
 # Setting up a custom class to manage a settings icon that's also a button
@@ -30,12 +33,12 @@ class ImageButton(ButtonBehavior, Image):
 
     def __init__(self, butt_type=None, **kwargs):
         super().__init__(**kwargs)
-        
+
         self.butt_type = butt_type
 
         if self.butt_type == "settings":
             self.source = "weather_pictures/settings_icon.png"
-            self.size_hint= (None, None)
+            self.size_hint = (None, None)
             self.size = (50, 50)
             self.pos_hint = (None, None)
             self.pos = (150, 150)
@@ -63,7 +66,8 @@ class ImageButton(ButtonBehavior, Image):
             self.unit_checkbox = ImageButton("checkbox")
             popup_layout.add_widget(self.unit_checkbox)
 
-            popup = Popup(title="Settings", size_hint=(None, None), size=(350, 200), content=popup_layout)
+            popup = Popup(title="Settings", size_hint=(None, None),
+                          size=(350, 200), content=popup_layout)
             popup.open()
 
         else:
@@ -84,7 +88,7 @@ class ImageButton(ButtonBehavior, Image):
             do = "on"
             data["use_celsius"] = True
             weather_app.weather_page.update_temp_now("imperial")
-        
+
         json.dump(data, open("settings.json", "w"))
         self.source = f"atlas://data/images/defaulttheme/checkbox_{do}"
 
@@ -114,39 +118,61 @@ class InputScreen(GridLayout):
         self.add_widget(self.inside)
 
         self.submit = Button(text="Enter", font_size=30, size_hint=(1.2, 0.5))
-        self.submit.bind(on_press=lambda x: self.get_weather_info(
-            city=self.inside.city.text, country=self.inside.country.text))
+        self.submit.bind(on_press=self.info_checker)
         self.add_widget(self.submit)
 
         self.auto_detect = Button(
             text="Detect your location", font_size=30, size_hint=(1.2, 0.5))
         self.auto_detect.bind(
-            on_press=lambda x: self.get_weather_info(check_type="auto"))
+            on_press=lambda x: self.info_checker(auto_detect=True))
         self.add_widget(self.auto_detect)
 
     def get_weather_info(self, check_type="manual", city="", country=""):
+        # Reading unit data
+        settings_data = json.load(open("settings.json"))
+        unit = "imperial" if not settings_data["use_celsius"] else "metric"
+        symbol = "F" if not settings_data["use_celsius"] else "C"
+        
+        if check_type == "auto":
+            data = auto_detect_loc(unit, symbol)
+            print(data)
+        else:
+            data = get_weather_data(
+                city, unit=unit, country=country, symbol=symbol)
+            if data == None:
+                self.handle_error()
+                weather_app.screen_manager.current = "Input Page"
+            print(data)
+
+        if data != None:
+            weather_app.weather_page.decorate_page(data)
+            self.go_to_weather_screen()
+
+    def go_to_weather_screen(self):
+        weather_app.screen_manager.current = "Weather Page"
+
+    def info_checker(self, instance=None, auto_detect=False):
+        """This method will check for any flaws in the input data and also checks if an internet connection is present"""
         if check_internet():
-            # Reading unit data
-            settings_data = json.load(open("settings.json"))
-            unit = "imperial" if not settings_data["use_celsius"] else "metric"
-            symbol = "F" if not settings_data["use_celsius"] else "C"
-            if check_type == "auto":
-                data = auto_detect_loc(unit, symbol)
-                print(data)
+            if auto_detect:
+                self.go_to_loading_screen()
+                check_type = "auto"
             else:
-                data = get_weather_data(city, unit=unit, country=country, symbol=symbol)
-                if data == None:
-                    self.handle_error()
-                print(data)
-            if data != None:
-                weather_app.weather_page.decorate_page(data)
-                self.go_to_weather_screen()
+                if self.inside.city.text == "":
+                    self.handle_error(err_type="missing data")
+                else:
+                    self.go_to_loading_screen()
+                    check_type = "manual"
+
+            Clock.schedule_once(lambda x: self.get_weather_info(
+                check_type=check_type, city=self.inside.city.text, country=self.inside.country.text), 0.8)
+
         else:
             print("No internet connection present")
             self.handle_error(err_type="no connection")
 
-    def go_to_weather_screen(self):
-        weather_app.screen_manager.current = "Weather Page"
+    def go_to_loading_screen(self):
+        weather_app.screen_manager.current = "Loading Page"
 
     def handle_error(self, err_type="missing data"):
         self.inside.city.text = ""
@@ -162,6 +188,16 @@ class InputScreen(GridLayout):
         popup.open()
 
 
+class LoadingScreen(GridLayout):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.cols = 1
+
+        self.loading_text = Label(text="Loading...", font_size=23)
+        self.add_widget(self.loading_text)
+
+
 class WeatherScreen(FloatLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -171,7 +207,7 @@ class WeatherScreen(FloatLayout):
 
         self.inside = GridLayout()
         self.inside.rows = 4
-        
+
         self.settings_button = ImageButton(butt_type="settings")
         self.inside.add_widget(self.settings_button)
 
@@ -268,6 +304,11 @@ class MyApp(App):
         self.weather_page = WeatherScreen()
         screen = Screen(name="Weather Page")
         screen.add_widget(self.weather_page)
+        self.screen_manager.add_widget(screen)
+
+        self.loading_page = LoadingScreen()
+        screen = Screen(name="Loading Page")
+        screen.add_widget(self.loading_page)
         self.screen_manager.add_widget(screen)
 
         return self.screen_manager
