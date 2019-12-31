@@ -1,4 +1,5 @@
 import datetime
+import json
 import os
 import socket
 
@@ -9,6 +10,16 @@ import requests
 # Using OpenWeather API and Bing Maps API
 API_KEY = os.environ.get("OPENWEATHER_API_KEY")
 BING_MAPS_KEY = os.environ.get("BING_MAPS_KEY")
+
+def create_settings_data():
+    """
+    This function will check for settings JSON file in the current directory and if it doesn't exist, this function will create that file
+    """
+    if not os.path.isfile("settings.json"):
+        with open("settings.json", "w") as settings_data:
+            data_to_write = {"use_celsius": False}
+
+            json.dump(data_to_write, settings_data)
 
 def unit_converter(value, unit):
     if unit == "metric":
