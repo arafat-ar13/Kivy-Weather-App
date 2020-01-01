@@ -11,15 +11,23 @@ import requests
 API_KEY = os.environ.get("OPENWEATHER_API_KEY")
 BING_MAPS_KEY = os.environ.get("BING_MAPS_KEY")
 
-def create_settings_data():
+def create_necessary_files():
     """
     This function will check for settings JSON file in the current directory and if it doesn't exist, this function will create that file
     """
+    # Checking for the settings file
     if not os.path.isfile("settings.json"):
         with open("settings.json", "w") as settings_data:
             data_to_write = {"use_celsius": False}
 
             json.dump(data_to_write, settings_data)
+    
+    # Checking for the favorites file
+    if not os.path.isfile("favorites.json"):
+        with open("favorites.json", "w") as favorites_data:
+            data_to_write = {"favorite_places": []}
+
+            json.dump(data_to_write, favorites_data)
 
 def unit_converter(value, unit):
     if unit == "metric":
