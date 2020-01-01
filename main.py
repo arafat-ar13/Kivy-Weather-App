@@ -6,6 +6,7 @@ from kivy.clock import Clock
 from kivy.config import Config
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.scrollview import ScrollView
 from kivy.uix.button import Button
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
@@ -16,38 +17,53 @@ from kivy.uix.screenmanager import Screen, ScreenManager, SlideTransition
 from kivy.uix.textinput import TextInput
 
 from backend import (auto_detect_loc, check_internet, get_weather_data,
-                     unit_converter, create_settings_data)
+                     unit_converter, create_necessary_files)
 
 Config.set('graphics', 'width', '500')
 Config.set('graphics', 'height', '400')
 
-# TODO: Implement a "Favorite Places" feature where users can add their favorite cities for quick access
-
 # Making a backend check to create a settings JSON file
-create_settings_data()
+create_necessary_files()
 
 
 # Setting up a custom class to manage a settings icon that's also a button
 class ImageButton(ButtonBehavior, Image):
     pressed = 0
 
-    def __init__(self, butt_type=None, **kwargs):
+    def __init__(self, butt_type=None, curr_city=None, **kwargs):
         super().__init__(**kwargs)
 
         self.butt_type = butt_type
+        # curr_city is used to check for favorite places
+        self.curr_city = curr_city
+
+        self.star_on = "weather_pictures/star_on.png"
+        self.star_off = "weather_pictures/star_off.png"
 
         if self.butt_type == "settings":
             self.source = "weather_pictures/settings_icon.png"
             self.size_hint = (None, None)
             self.size = (50, 50)
-            self.pos_hint = (None, None)
-            self.pos = (150, 150)
 
-        elif self.butt_type == "checkbox":
+        elif self.butt_type == "star":
+            self.show_star()
+
+        else:
             self.show_checkbox()
 
-    # This method is called the first time the checkbox is to be shown
-    # Therefore it reads the JSON file to show the checkbox appropriately
+    # The two similar methods below are solely used for the purposes of showing the checkbox and star 
+    # button in the correct state (checked/unchecked or on/off)
+    def show_star(self):
+        self.favorites = json.load(open("favorites.json"))
+
+        if self.curr_city in self.favorites["favorite_places"]:
+            self.source = self.star_on
+        else:
+            self.source = self.star_off
+
+        self.size_hint = (None, None)
+        self.size = (50, 50)
+
     def show_checkbox(self):
         self.settings_data = json.load(open("settings.json"))
 
@@ -73,24 +89,37 @@ class ImageButton(ButtonBehavior, Image):
         else:
             self.toggle()
 
-    # This method again reads the JSON file which might look redundant but it is to keep in mind
-    # that this method is to be called every the checkbox if clicked so it is important to read and write to JSON
-    # file regardless of if the JSON is already read before
     def toggle(self):
-        self.settings_data = json.load(open("settings.json"))
+        """
+        This method reads the JSON files available to know the state of how the settings are. It then toggles the checkbox or star button appropriately
+        """
+        if self.butt_type == "star":
+            data_to_write = {"favorite_places": self.favorites["favorite_places"]}
 
-        data = {"use_celsius": ""}
-        if self.settings_data["use_celsius"]:
-            do = "off"
-            data["use_celsius"] = False
-            weather_app.weather_page.update_temp_now("metric")
+            if self.source == self.star_on:
+                self.source = self.star_off
+                data_to_write["favorite_places"].remove(self.curr_city)
+            else:
+                self.source = self.star_on
+                data_to_write["favorite_places"].append(self.curr_city)
+
+            json.dump(data_to_write, open("favorites.json", "w"))
+        
         else:
-            do = "on"
-            data["use_celsius"] = True
-            weather_app.weather_page.update_temp_now("imperial")
+            self.settings_data = json.load(open("settings.json"))
 
-        json.dump(data, open("settings.json", "w"))
-        self.source = f"atlas://data/images/defaulttheme/checkbox_{do}"
+            data = {"use_celsius": ""}
+            if self.settings_data["use_celsius"]:
+                do = "off"
+                data["use_celsius"] = False
+                weather_app.weather_page.update_temp_now("metric")
+            else:
+                do = "on"
+                data["use_celsius"] = True
+                weather_app.weather_page.update_temp_now("imperial")
+
+            json.dump(data, open("settings.json", "w"))
+            self.source = f"atlas://data/images/defaulttheme/checkbox_{do}"
 
 
 class InputScreen(GridLayout):
@@ -118,14 +147,21 @@ class InputScreen(GridLayout):
         self.add_widget(self.inside)
 
         self.submit = Button(text="Enter", font_size=30, size_hint=(1.2, 0.5))
-        self.submit.bind(on_press=self.info_checker)
+        self.submit.bind(on_press=lambda x:self.info_checker(city=self.inside.city.text, country=self.inside.country.text))
         self.add_widget(self.submit)
 
         self.auto_detect = Button(
             text="Detect your location", font_size=30, size_hint=(1.2, 0.5))
         self.auto_detect.bind(
-            on_press=lambda x: self.info_checker(auto_detect=True))
+            on_press=lambda x: self.info_checker(auto_detect=True, city=self.inside.city.text, country=self.inside.country.text))
         self.add_widget(self.auto_detect)
+
+        self.favorites = Button(text="Favorite cities", font_size=30, size_hint=(0.8, 0.3), on_press=self.go_to_fav_screen)
+        self.add_widget(self.favorites)
+
+    def go_to_fav_screen(self, instance):
+        weather_app.favorites_page.show_faves()
+        weather_app.screen_manager.current = "Favorites Page"
 
     def get_weather_info(self, check_type="manual", city="", country=""):
         # Reading unit data
@@ -151,21 +187,21 @@ class InputScreen(GridLayout):
     def go_to_weather_screen(self):
         weather_app.screen_manager.current = "Weather Page"
 
-    def info_checker(self, instance=None, auto_detect=False):
+    def info_checker(self, city, country="", instance=None, auto_detect=False):
         """This method will check for any flaws in the input data and also checks if an internet connection is present"""
         if check_internet():
             if auto_detect:
                 self.go_to_loading_screen()
-                check_type = "auto"
+                Clock.schedule_once(lambda x: self.get_weather_info(
+                    check_type="auto", city=city, country=country), 0.8)
             else:
-                if self.inside.city.text == "":
+                if city == "":
                     self.handle_error(err_type="missing data")
                 else:
                     self.go_to_loading_screen()
-                    check_type = "manual"
 
-            Clock.schedule_once(lambda x: self.get_weather_info(
-                check_type=check_type, city=self.inside.city.text, country=self.inside.country.text), 0.8)
+                    Clock.schedule_once(lambda x: self.get_weather_info(
+                        check_type="manual", city=city, country=country), 0.8)
 
         else:
             print("No internet connection present")
@@ -198,6 +234,40 @@ class LoadingScreen(GridLayout):
         self.add_widget(self.loading_text)
 
 
+class FavoritesScreen(GridLayout):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.cols = 1
+    
+    def show_faves(self):
+        self.favorites = json.load(open("favorites.json"))
+
+        layout = GridLayout(cols=1, size_hint_y=None)
+        layout.bind(minimum_height=layout.setter('height'))
+
+        for place in self.favorites["favorite_places"]:
+            layout.add_widget(Button(text=place, on_press=self.process_fave, size_hint_y=None, height=90))
+
+        layout.add_widget(Button(text="Go back", on_press=self.back, size_hint_y=None, height=90))
+
+        root = ScrollView(size_hint=(1, None), size=(500, 400))
+        root.add_widget(layout)
+        
+        self.add_widget(root)
+
+    def back(self, instance):
+        weather_app.screen_manager.current = "Input Page"
+        Clock.schedule_once(lambda x: self.clear_widgets(), 0.8)
+
+    def process_fave(self, instance):
+        city = instance.text.split(",")[0]
+        country = instance.text.split(",")[-1].strip()
+
+        weather_app.input_page.info_checker(city=city, country=country)
+        Clock.schedule_once(lambda x: self.clear_widgets(), 0.8)
+
+
 class WeatherScreen(FloatLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -207,9 +277,16 @@ class WeatherScreen(FloatLayout):
 
         self.inside = GridLayout()
         self.inside.rows = 4
+        self.inside.cols = 1
 
+        self.toolbar_layout = GridLayout(cols=2)
         self.settings_button = ImageButton(butt_type="settings")
-        self.inside.add_widget(self.settings_button)
+        self.toolbar_layout.add_widget(self.settings_button)
+    
+        self.star_button = ImageButton(butt_type="star", curr_city=f"{self.city}, {self.country}")
+        self.toolbar_layout.add_widget(self.star_button)
+
+        self.inside.add_widget(self.toolbar_layout)
 
         if self.time_state == "Day":
             color = [0, 0, 0, 1]
@@ -310,6 +387,12 @@ class MyApp(App):
         screen = Screen(name="Loading Page")
         screen.add_widget(self.loading_page)
         self.screen_manager.add_widget(screen)
+
+        self.favorites_page = FavoritesScreen()
+        screen = Screen(name="Favorites Page")
+        screen.add_widget(self.favorites_page)
+        self.screen_manager.add_widget(screen)
+
 
         return self.screen_manager
 
