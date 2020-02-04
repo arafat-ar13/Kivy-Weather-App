@@ -207,6 +207,8 @@ class InputScreen(GridLayout):
             print("No internet connection present")
             self.handle_error(err_type="no connection")
 
+            weather_app.favorites_page.update_remove_widgets()
+
     def go_to_loading_screen(self):
         weather_app.screen_manager.current = "Loading Page"
 
@@ -239,6 +241,9 @@ class FavoritesScreen(GridLayout):
         super().__init__(**kwargs)
 
         self.cols = 1
+
+        # A lookout variable to know if widgets on the favorites screen are to be cleared or not
+        self.remove_widgets = ""
     
     def show_faves(self):
         self.favorites = json.load(open("favorites.json"))
@@ -260,12 +265,17 @@ class FavoritesScreen(GridLayout):
         weather_app.screen_manager.current = "Input Page"
         Clock.schedule_once(lambda x: self.clear_widgets(), 0.8)
 
+    def update_remove_widgets(self):
+        self.remove_widgets = True
+
     def process_fave(self, instance):
         city = instance.text.split(",")[0]
         country = instance.text.split(",")[-1].strip()
 
         weather_app.input_page.info_checker(city=city, country=country)
-        Clock.schedule_once(lambda x: self.clear_widgets(), 0.8)
+
+        if not self.remove_widgets:
+            Clock.schedule_once(lambda x: self.clear_widgets(), 0.8)
 
 
 class WeatherScreen(FloatLayout):
