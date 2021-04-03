@@ -24,7 +24,7 @@ olefile==0.46
 Pillow==7.1.0
 pycodestyle==2.5.0
 pycparser==2.20
-Pygments==2.6.1
+Pygments==2.7.4
 pylint==2.4.4
 pyOpenSSL==19.1.0
 PySocks==1.7.1
